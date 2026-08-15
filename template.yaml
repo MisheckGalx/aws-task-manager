@@ -1,0 +1,137 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Serverless Task Manager REST API — API Gateway + Lambda (Python) + DynamoDB
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 10
+    MemorySize: 128
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref TasksTable
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+
+Resources:
+  # ---------- DynamoDB ----------
+  TasksTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub tasks-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: userId
+          AttributeType: S
+        - AttributeName: taskId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: userId   # partition key
+          KeyType: HASH
+        - AttributeName: taskId   # sort key
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+
+  # ---------- API Gateway ----------
+  TaskApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Stage
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization'"
+        AllowOrigin: "'*'"
+
+  # ---------- Lambda functions ----------
+  CreateTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/handlers/
+      Handler: create_task.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref TaskApi
+            Path: /tasks
+            Method: post
+
+  ListTasksFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/handlers/
+      Handler: list_tasks.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TasksTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref TaskApi
+            Path: /tasks
+            Method: get
+
+  GetTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/handlers/
+      Handler: get_task.handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TasksTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref TaskApi
+            Path: /tasks/{taskId}
+            Method: get
+
+  UpdateTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/handlers/
+      Handler: update_task.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref TaskApi
+            Path: /tasks/{taskId}
+            Method: put
+
+  DeleteTaskFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/handlers/
+      Handler: delete_task.handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TasksTable
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref TaskApi
+            Path: /tasks/{taskId}
+            Method: delete
+
+Outputs:
+  ApiUrl:
+    Description: Base URL for the Task API
+    Value: !Sub https://${TaskApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/
+  TableName:
+    Value: !Ref TasksTable
