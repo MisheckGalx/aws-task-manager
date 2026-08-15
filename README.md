@@ -8,25 +8,25 @@ It's a simple idea on purpose: create, list, get, update, and delete tasks. The 
 
 A request comes in through API Gateway, gets routed to the right Lambda function based on the HTTP method and path, and that function reads or writes to a DynamoDB table. Every Lambda has its own scoped IAM role — it can only touch the one table it needs, nothing else.
 
-![Architecture diagram](docs/screenshots/serverless_rest_api_architecture.png)
+![Architecture diagram](screenshots/serverless_rest_api_architecture.png)
 
 ## What it actually looks like, deployed
 
 **CloudFormation created every piece of infrastructure from one template — no manual clicking around the console.**
 
-![CloudFormation stack](docs/screenshots/cloudformation.png)
+![CloudFormation stack](screenshots/cloudformation.png)
 
 **Five Lambda functions, one per operation, each independently deployable and independently permissioned.**
 
-![Lambda functions](docs/screenshots/lambda.png)
+![Lambda functions](screenshots/lambda.png)
 
 **The DynamoDB table, holding real task data created through the live API.**
 
-![DynamoDB table](docs/screenshots/dynamodb.png)
+![DynamoDB table](screenshots/dynamodb.png)
 
 **API Gateway's resource tree — /tasks and /tasks/{taskId}, wired to their Lambda functions.**
 
-![API Gateway resources](docs/screenshots/api-gateway.png)
+![API Gateway resources](screenshots/api-gateway.png)
 
 ## Why it's built this way
 
