@@ -1,32 +1,40 @@
-# aws-task-manager — Serverless REST API
+# aws-task-manager
 
-A CRUD REST API for managing tasks, built entirely on AWS: API Gateway -> Lambda (Python) -> DynamoDB. No servers to patch, scales to zero, pay only per request.
+A serverless REST API for managing tasks — built as a hands-on project to learn how API Gateway, Lambda, and DynamoDB fit together on AWS.
+
+It's a simple idea on purpose: create, list, get, update, and delete tasks. The point wasn't the app itself — it was building and deploying a real serverless backend from scratch, end to end, no shortcuts.
 
 ## Architecture
 
-Client -> API Gateway -> Lambda (per route) -> DynamoDB (tasks table), with CloudWatch Logs collecting Lambda output.
+A request comes in through API Gateway, gets routed to the right Lambda function based on the HTTP method and path, and that function reads or writes to a DynamoDB table. Every Lambda has its own scoped IAM role — it can only touch the one table it needs, nothing else.
 
-- API Gateway: REST API, routes each HTTP method to its own Lambda.
-- Lambda: one small function per operation (create/list/get/update/delete), each with a scoped IAM role.
-- DynamoDB: single table, userId as partition key, taskId as sort key. Listing a user's tasks is one efficient Query, not a full table Scan.
+![Architecture diagram](docs/screenshots/serverless_rest_api_architecture.png)
 
-## Why this pattern (solutions-architect view)
+## What it actually looks like, deployed
 
-- Single-table design (userId as PK, taskId as SK) avoids expensive table scans as data grows.
-- One Lambda per route: smaller blast radius, independent scaling, tighter IAM permissions per function.
-- PAY_PER_REQUEST billing on DynamoDB: no capacity planning needed for a project at this stage.
-- Auth stub: get_user_id() currently reads an x-user-id header for easy curl testing. Swap in a real Cognito authorizer before production use.
+**CloudFormation created every piece of infrastructure from one template — no manual clicking around the console.**
 
-## Run tests locally (no AWS needed)
+![CloudFormation stack](docs/screenshots/cloudformation.png)
 
-python3 -m venv venv
-source venv/bin/activate
-pip install boto3 moto pytest
-pytest tests/ -v
+**Five Lambda functions, one per operation, each independently deployable and independently permissioned.**
 
-All 5 tests mock DynamoDB with moto, so handler logic can be verified without touching AWS.
+![Lambda functions](docs/screenshots/lambda.png)
 
-## Deploy
+**The DynamoDB table, holding real task data created through the live API.**
+
+![DynamoDB table](docs/screenshots/dynamodb.png)
+
+**API Gateway's resource tree — /tasks and /tasks/{taskId}, wired to their Lambda functions.**
+
+![API Gateway resources](docs/screenshots/api-gateway.png)
+
+## Why it's built this way
+
+- **`userId` + `taskId` as the DynamoDB key**: this lets me fetch all of one user's tasks with a single, cheap `Query` — not a full table scan. That one decision is the difference between a table that stays fast as it grows and one that doesn't.
+- **One Lambda per route, not one big function**: each function does one thing, has its own minimal IAM permissions, and can be changed or redeployed without touching the others.
+- **Pay-per-request billing**: no capacity planning needed at this stage — cost scales with actual usage, not provisioned capacity sitting idle.
+- **Auth is currently a header stub** (`x-user-id`), specifically so I could test the whole flow with `curl` before wiring up real authentication. Swapping in Cognito is the next step, not an afterthought — the code path for it is already there.
+
 
 sam build
 sam deploy --guided
